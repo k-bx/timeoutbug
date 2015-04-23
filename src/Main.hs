@@ -10,7 +10,7 @@ import           Control.Lens
 import           Control.Monad.IO.Class     (liftIO)
 import           Data.Maybe
 import           Data.Monoid
-import           Data.String.Class          (toString)
+import           Data.String.Class          (toString, fromString)
 import           Network.HTTP.Client        (Manager)
 import qualified Network.HTTP.Client        as HTTPClient
 import           Network.Wreq
@@ -35,9 +35,9 @@ site mgr =
 workerHandler :: Manager -> Snap ()
 workerHandler mgr = do
     let ps = [Provider1, Provider2]
-    rs <- liftIO $ fmap catMaybes $ mapConcurrently fetch ps
+    rs <- doo `seq` liftIO $ fmap catMaybes $ mapConcurrently fetch ps
     -- liftIO $ putStrLn ("Got results! " ++ show rs)
-    writeBS "Ok!"
+    doo `seq` writeBS (fromString (show rs))
   where
     fetch p = ctch p $ tm p $ do
       case p of
@@ -46,10 +46,10 @@ workerHandler mgr = do
           let opts = defaults & manager .~ (Right mgr)
           r <- getWith opts "http://localhost:8001/slowserve"
           -- liftIO $ putStrLn ("Got response: " <> toString (r ^. responseBody))
-          return (Just Provider1Response)
+          return (doo `seq` (Just (Provider1Response (r ^. responseBody))))
         Provider2 -> do
           -- putStrLn "Provider2 is pure"
-          return (Just Provider2Response)
+          return (doo `seq` (Just Provider2Response))
     tm p f = do
         res <- timeout (100000 * 5) f
         case res of
@@ -73,9 +73,17 @@ data Provider = Provider1
               | Provider2
     deriving (Show, Eq)
 
-data ProviderResponse = Provider1Response
-                      | Provider2Response
+data ProviderResponse a = Provider1Response a
+                        | Provider2Response
     deriving (Show, Eq)
 
 sec :: Int
 sec = 10^(6::Int)
+
+-- | Unintentionally slow fibonacci
+fib :: Integer -> Integer
+fib 0 = 1
+fib 1 = 1
+fib n = fib (n - 1) * n
+
+doo = fib 20000

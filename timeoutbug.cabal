@@ -17,6 +17,7 @@ Executable timeoutbug
   Build-depends: async
                , base
                , bytestring
+               , deepseq
                , enclosed-exceptions
                , http-client
                , lens
